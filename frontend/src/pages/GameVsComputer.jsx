@@ -88,8 +88,8 @@ export default function GameVsComputer({ user, onNavigate, onLogout }) {
   const [coachHighlight, setCoachHighlight] = useState(null);
   const [coachLoading, setCoachLoading] = useState(false);
 
-  // Scroll ref for move history
-  const historyEndRef = useRef(null);
+  // Scroll ref for move history container
+  const scrollContainerRef = useRef(null);
 
   // Sync state to local storage on changes
   useEffect(() => {
@@ -102,10 +102,10 @@ export default function GameVsComputer({ user, onNavigate, onLogout }) {
     localStorage.setItem('sp_chess_last_move', JSON.stringify(lastMove));
   }, [gameStarted, fen, playerColor, botLevel, boardTheme, history, lastMove]);
 
-  // Scroll history down when moves are added
+  // Scroll history down internally when moves are added (without shifting the window viewport)
   useEffect(() => {
-    if (historyEndRef.current) {
-      historyEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
   }, [history]);
 
@@ -453,7 +453,7 @@ export default function GameVsComputer({ user, onNavigate, onLogout }) {
   // Main Active Game Play Area
   // ----------------------------------------------------
   return (
-    <div className="animate-fade-in" style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+    <div className="game-container animate-fade-in">
       
       {/* Header bar */}
       <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px', padding: '16px 24px' }}>
@@ -483,10 +483,10 @@ export default function GameVsComputer({ user, onNavigate, onLogout }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1.2fr 0.8fr))', gap: '24px', alignItems: 'start' }}>
+      <div className="game-layout-grid">
         
         {/* Left column: Chessboard */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
           
           {/* Opponent (Computer) Info Badge */}
           <div style={{
@@ -653,15 +653,18 @@ export default function GameVsComputer({ user, onNavigate, onLogout }) {
           <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', height: '220px' }}>
             <h4 style={{ fontSize: '1rem', color: 'var(--text-muted)', marginBottom: '10px' }}>📊 Zugprotokoll</h4>
             
-            <div style={{ 
-              flex: 1, 
-              overflowY: 'auto', 
-              background: 'rgba(0,0,0,0.2)',
-              borderRadius: 'var(--border-radius-sm)',
-              padding: '10px',
-              fontFamily: 'monospace',
-              fontSize: '0.88rem'
-            }}>
+            <div 
+              ref={scrollContainerRef}
+              style={{ 
+                flex: 1, 
+                overflowY: 'auto', 
+                background: 'rgba(0,0,0,0.2)',
+                borderRadius: 'var(--border-radius-sm)',
+                padding: '10px',
+                fontFamily: 'monospace',
+                fontSize: '0.88rem'
+              }}
+            >
               {movePairs.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem' }}>Noch keine Züge gemacht.</div>
               ) : (
@@ -681,7 +684,6 @@ export default function GameVsComputer({ user, onNavigate, onLogout }) {
                         <td style={{ padding: '4px 0', color: pair.black ? 'var(--text-main)' : 'transparent' }}>{pair.black || '-'}</td>
                       </tr>
                     ))}
-                    <tr ref={historyEndRef} />
                   </tbody>
                 </table>
               )}

@@ -11,7 +11,7 @@ import GameVsComputer from './pages/GameVsComputer';
 function App() {
   const [token, setToken] = useState(localStorage.getItem('chess_token') || null);
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('chess_user')) || null);
-  const [theme, setTheme] = useState(localStorage.getItem('chess_theme') || 'dark');
+  const [theme, setTheme] = useState(localStorage.getItem('chess_theme') || 'light');
   
   // Custom hash routing state
   const [route, setRoute] = useState({ page: 'dashboard', param: null });
