@@ -1,0 +1,206 @@
+/* ChessBoard Styles */
+
+.board-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.chess-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  position: relative;
+  border: 4px solid var(--board-border, #1e293b);
+  user-select: none;
+}
+
+/* Themes Mapping */
+.board-theme-wood {
+  --board-light: var(--board-wood-light);
+  --board-dark: var(--board-wood-dark);
+  --board-border: var(--board-wood-border);
+}
+
+.board-theme-modern {
+  --board-light: var(--board-modern-light);
+  --board-dark: var(--board-modern-dark);
+  --board-border: var(--board-modern-border);
+}
+
+.board-theme-green {
+  --board-light: var(--board-green-light);
+  --board-dark: var(--board-green-dark);
+  --board-border: var(--board-green-border);
+}
+
+.board-theme-blue {
+  --board-light: var(--board-blue-light);
+  --board-dark: var(--board-blue-dark);
+  --board-border: var(--board-blue-border);
+}
+
+/* Square */
+.board-square {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.board-square.light-square {
+  background-color: var(--board-light);
+  color: var(--board-dark);
+}
+
+.board-square.dark-square {
+  background-color: var(--board-dark);
+  color: var(--board-light);
+}
+
+/* Piece dragging & hovering */
+.board-piece {
+  width: 85%;
+  height: 85%;
+  z-index: 10;
+  transition: transform 0.1s ease, filter 0.15s ease;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+
+.board-square:hover .board-piece {
+  transform: scale(1.08);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+}
+
+/* Labels (files & ranks) like lichess */
+.square-label {
+  position: absolute;
+  font-size: 0.65rem;
+  font-weight: 700;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.square-label.file-label {
+  bottom: 2px;
+  right: 4px;
+}
+
+.square-label.rank-label {
+  top: 2px;
+  left: 4px;
+}
+
+/* Selection & Move Highlights */
+.board-square.selected-square {
+  background-color: rgba(245, 158, 11, 0.5) !important; /* Semi-transparent warning/amber */
+}
+
+.board-square.last-move-square {
+  background-color: rgba(56, 189, 248, 0.35) !important; /* Accent color tint */
+}
+
+.board-square.king-checked {
+  background-color: rgba(244, 63, 94, 0.55) !important; /* Danger glow */
+  animation: pulse-check 1.5s infinite alternate;
+}
+
+.board-square.coach-highlight-square {
+  background-color: rgba(16, 185, 129, 0.45) !important; /* Green success glow */
+  animation: pulse-coach 1.0s infinite alternate;
+}
+
+@keyframes pulse-check {
+  0% { box-shadow: inset 0 0 10px rgba(244, 63, 94, 0.5); }
+  100% { box-shadow: inset 0 0 25px rgba(244, 63, 94, 0.9); }
+}
+
+@keyframes pulse-coach {
+  0% { box-shadow: inset 0 0 8px rgba(16, 185, 129, 0.4); }
+  100% { box-shadow: inset 0 0 20px rgba(16, 185, 129, 0.85); }
+}
+
+/* Legal Move Dots */
+.legal-dot {
+  width: 25%;
+  height: 25%;
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 50%;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.board-square.dark-square .legal-dot {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.legal-ring {
+  width: 80%;
+  height: 80%;
+  border: 4px solid rgba(0, 0, 0, 0.15);
+  border-radius: 50%;
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.board-square.dark-square .legal-ring {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Promotion Modal/Overlay */
+.promotion-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border-radius: var(--border-radius-md);
+}
+
+.promotion-box {
+  background: var(--bg-panel);
+  border: var(--border-premium);
+  border-radius: var(--border-radius-lg);
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  box-shadow: var(--shadow-premium);
+}
+
+.promotion-option {
+  width: 60px;
+  height: 60px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.promotion-option:hover {
+  background-color: rgba(56, 189, 248, 0.2);
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+}

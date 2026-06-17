@@ -1,0 +1,186 @@
+/* Modern Chess App Design System */
+
+:root {
+  /* Core Colors */
+  --bg-main: #0b0f19;
+  --bg-panel: rgba(17, 24, 39, 0.75);
+  --bg-panel-hover: rgba(31, 41, 55, 0.85);
+  --border-glow: rgba(56, 189, 248, 0.2);
+  --border-glow-active: rgba(56, 189, 248, 0.6);
+  
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  --text-muted-dark: #4b5563;
+
+  /* Accent Colors */
+  --color-accent: #38bdf8;
+  --color-accent-hover: #0ea5e9;
+  --color-success: #10b981;
+  --color-danger: #f43f5e;
+  --color-warning: #f59e0b;
+
+  /* Fonts */
+  --font-display: 'Outfit', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* Card and Panel Utilities */
+  --backdrop-blur: blur(12px);
+  --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.7), 0 1px 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --border-premium: 1px solid rgba(255, 255, 255, 0.08);
+  --border-radius-lg: 16px;
+  --border-radius-md: 10px;
+  --border-radius-sm: 6px;
+
+  /* Chess Board Theme Colors */
+  /* Theme 1: Classic Wood */
+  --board-wood-light: #f0d9b5;
+  --board-wood-dark: #b58863;
+  --board-wood-border: #8c6239;
+
+  /* Theme 2: Modern Light/Dark */
+  --board-modern-light: #e2e8f0;
+  --board-modern-dark: #475569;
+  --board-modern-border: #1e293b;
+
+  /* Theme 3: Green/White */
+  --board-green-light: #eeeed2;
+  --board-green-dark: #769656;
+  --board-green-border: #4a5f36;
+
+  /* Theme 4: Blue/Grey */
+  --board-blue-light: #e9edf6;
+  --board-blue-dark: #829ab1;
+  --board-blue-border: #486581;
+}
+
+/* Light Theme Variables */
+.light-theme {
+  --bg-main: #f1f5f9;
+  --bg-panel: rgba(255, 255, 255, 0.85);
+  --bg-panel-hover: rgba(241, 245, 249, 0.95);
+  --border-glow: rgba(14, 165, 233, 0.15);
+  --border-glow-active: rgba(14, 165, 233, 0.5);
+  
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-muted-dark: #94a3b8;
+
+  --border-premium: 1px solid rgba(15, 23, 42, 0.08);
+  --shadow-premium: 0 10px 30px -10px rgba(15, 23, 42, 0.12), 0 1px 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.08) 0px, transparent 50%);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body.light-theme {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.06) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(79, 70, 229, 0.06) 0px, transparent 50%);
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Glassmorphism Panel Class */
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: var(--border-premium);
+  box-shadow: var(--shadow-premium);
+  border-radius: var(--border-radius-lg);
+  padding: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel:hover {
+  border-color: rgba(56, 189, 248, 0.2);
+  box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.8), 0 0 20px 0 rgba(56, 189, 248, 0.05);
+}
+
+/* Base Buttons */
+.btn {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 12px 24px;
+  border-radius: var(--border-radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-accent), #4f46e5);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--color-danger), #b91c1c);
+  color: white;
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(244, 63, 94, 0.3);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
