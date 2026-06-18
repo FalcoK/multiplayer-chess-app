@@ -290,7 +290,7 @@ app.post('/api/games/:gameId/join', authenticateToken, async (req, res) => {
       } else {
         // The opponent accepts the challenge
         await db.run(
-          'UPDATE games SET status = 'playing', last_move_timestamp = ? WHERE id = ?',
+          "UPDATE games SET status = 'playing', last_move_timestamp = ? WHERE id = ?",
           [Date.now(), gameId]
         );
 
@@ -316,10 +316,10 @@ app.post('/api/games/:gameId/join', authenticateToken, async (req, res) => {
     let params = [];
 
     if (!game.white_player_id) {
-      query = 'UPDATE games SET white_player_id = ?, white_player_name = ?, status = 'playing', last_move_timestamp = ? WHERE id = ?';
+      query = "UPDATE games SET white_player_id = ?, white_player_name = ?, status = 'playing', last_move_timestamp = ? WHERE id = ?";
       params = [req.user.id, req.user.username, Date.now(), gameId];
     } else if (!game.black_player_id) {
-      query = 'UPDATE games SET black_player_id = ?, black_player_name = ?, status = 'playing', last_move_timestamp = ? WHERE id = ?';
+      query = "UPDATE games SET black_player_id = ?, black_player_name = ?, status = 'playing', last_move_timestamp = ? WHERE id = ?";
       params = [req.user.id, req.user.username, Date.now(), gameId];
     } else {
       return res.status(400).json({ error: 'Spiel ist voll.' });
@@ -422,7 +422,7 @@ app.get('/api/games/:gameId', async (req, res) => {
 // List Active Public Games
 app.get('/api/games', async (req, res) => {
   try {
-    const games = await db.all('SELECT * FROM games WHERE is_private = 0 AND status = 'pending'');
+    const games = await db.all("SELECT * FROM games WHERE is_private = 0 AND status = 'pending'");
     res.json(games);
   } catch (err) {
     console.error(err);
@@ -639,7 +639,7 @@ app.post('/api/tournaments/:id/start', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Mindestens 2 Spieler erforderlich.' });
     }
 
-    await db.run('UPDATE tournaments SET status = 'active' WHERE id = ?', [id]);
+    await db.run("UPDATE tournaments SET status = 'active' WHERE id = ?", [id]);
 
     // Create matches
     if (t.type === 'round_robin') {
@@ -937,11 +937,11 @@ io.on('connection', (socket) => {
           io.to(`game:${gameId}`).emit('takeback_accepted', { game: updatedGame });
         } else {
           // No moves to rollback
-          await db.run('UPDATE games SET status = 'playing' WHERE id = ?', [gameId]);
+          await db.run("UPDATE games SET status = 'playing' WHERE id = ?", [gameId]);
           io.to(`game:${gameId}`).emit('takeback_declined');
         }
       } else {
-        await db.run('UPDATE games SET status = 'playing' WHERE id = ?', [gameId]);
+        await db.run("UPDATE games SET status = 'playing' WHERE id = ?", [gameId]);
         io.to(`game:${gameId}`).emit('takeback_declined');
       }
     } catch (err) {
@@ -988,7 +988,7 @@ io.on('connection', (socket) => {
         io.to(`game:${gameId}`).emit('game_finished', { game: updatedGame });
         await handleGameCompletionEloAndTournament(updatedGame);
       } else {
-        await db.run('UPDATE games SET status = 'playing' WHERE id = ?', [gameId]);
+        await db.run("UPDATE games SET status = 'playing' WHERE id = ?", [gameId]);
         io.to(`game:${gameId}`).emit('draw_declined');
       }
     } catch (err) {
@@ -1091,7 +1091,7 @@ async function handleGameCompletionEloAndTournament(game) {
       );
 
       // Check if all tournament games are finished to auto-finish tournament
-      const unfinishedGames = await db.all('SELECT * FROM games WHERE tournament_id = ? AND status != 'finished'', [game.tournament_id]);
+      const unfinishedGames = await db.all("SELECT * FROM games WHERE tournament_id = ? AND status != 'finished'", [game.tournament_id]);
       if (unfinishedGames.length === 0) {
         // Find winner
         const topParticipant = await db.get(`
@@ -1103,7 +1103,7 @@ async function handleGameCompletionEloAndTournament(game) {
 
         if (topParticipant) {
           await db.run(
-            'UPDATE tournaments SET status = 'finished', winner_id = ? WHERE id = ?',
+            "UPDATE tournaments SET status = 'finished', winner_id = ? WHERE id = ?",
             [topParticipant.user_id, game.tournament_id]
           );
         }
@@ -1136,7 +1136,7 @@ async function handleGameCompletionEloAndTournament(game) {
 
         // Check if all games of the current "round" are done.
         // We know a KO round is done when all active matches in the DB are finished.
-        const activeMatches = await db.all('SELECT * FROM games WHERE tournament_id = ? AND status != 'finished'', [game.tournament_id]);
+        const activeMatches = await db.all("SELECT * FROM games WHERE tournament_id = ? AND status != 'finished'", [game.tournament_id]);
         if (activeMatches.length === 0) {
           // Generate next round pairings for remaining active participants
           const remaining = await db.all(`
@@ -1149,7 +1149,7 @@ async function handleGameCompletionEloAndTournament(game) {
           if (remaining.length === 1) {
             // One player left, tournament won!
             await db.run(
-              'UPDATE tournaments SET status = 'finished', winner_id = ? WHERE id = ?',
+              "UPDATE tournaments SET status = 'finished', winner_id = ? WHERE id = ?",
               [remaining[0].user_id, game.tournament_id]
             );
           } else if (remaining.length > 1) {
