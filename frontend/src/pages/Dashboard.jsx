@@ -273,9 +273,7 @@ export default function Dashboard({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {challenges.map((ch) => {
                   const isSent = ch.challenger_id === user.id;
-                  const opponentName = isSent 
-                    ? (ch.white_player_id === user.id ? ch.black_player_name : ch.white_player_name)
-                    : (ch.white_player_id === user.id ? ch.white_player_name : ch.black_player_name);
+                  const opponentName = ch.white_player_id === user.id ? ch.black_player_name : ch.white_player_name;
                   
                   return (
                     <div 
