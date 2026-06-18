@@ -5,13 +5,21 @@ export default function Dashboard({
   user,
   token,
   onNavigate,
-  onLogout
+  onLogout,
+  initialChallengeUserId
 }) {
   const [activeGames, setActiveGames] = useState([]);
   const [activeTournaments, setActiveTournaments] = useState([]);
   const [loadingGames, setLoadingGames] = useState(true);
   const [loadingTournaments, setLoadingTournaments] = useState(true);
   
+  // Direct challenges and user list state
+  const [challenges, setChallenges] = useState([]);
+  const [registeredUsers, setRegisteredUsers] = useState([]);
+  const [loadingChallenges, setLoadingChallenges] = useState(true);
+  const [showChallengeModal, setShowChallengeModal] = useState(false);
+  const [selectedOpponent, setSelectedOpponent] = useState(null);
+
   // Game creation state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [eloRelevant, setEloRelevant] = useState(true);
@@ -23,10 +31,20 @@ export default function Dashboard({
   const [allowChat, setAllowChat] = useState(true);
   const [error, setError] = useState('');
 
-  // Fetch games & tournaments
+  // Fetch games, tournaments, challenges & users
   useEffect(() => {
     fetchGames();
     fetchTournaments();
+    fetchChallenges();
+    fetchRegisteredUsers();
+
+    const interval = setInterval(() => {
+      fetchGames();
+      fetchTournaments();
+      fetchChallenges();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [token]);
 
   const fetchGames = async () => {
@@ -58,6 +76,118 @@ export default function Dashboard({
       setLoadingTournaments(false);
     }
   };
+
+  const fetchChallenges = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/challenges`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setChallenges(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingChallenges(false);
+    }
+  };
+
+  const fetchRegisteredUsers = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/users`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRegisteredUsers(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAcceptChallenge = async (gameId) => {
+    try {
+      const res = await fetch(`${API_BASE}/games/${gameId}/join`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Fehler beim Annehmen der Herausforderung.');
+      onNavigate(`game:${gameId}`);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeclineChallenge = async (gameId) => {
+    if (window.confirm('Herausforderung wirklich ablehnen oder abbrechen?')) {
+      try {
+        const res = await fetch(`${API_BASE}/games/${gameId}/decline`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Fehler beim Ablehnen.');
+        fetchChallenges();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  };
+
+  const handleSendChallenge = async (e) => {
+    e.preventDefault();
+    if (!selectedOpponent) {
+      alert('Bitte wähle einen Gegner aus.');
+      return;
+    }
+
+    let actualTimeMs = timeLimitMs;
+    if (timeControl === 'blitz') actualTimeMs = 600000;
+    if (timeControl === '24h') actualTimeMs = 86400000;
+    if (timeControl === '48h') actualTimeMs = 172800000;
+
+    try {
+      const res = await fetch(`${API_BASE}/games`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+         },
+        body: JSON.stringify({
+          opponent_id: selectedOpponent.id,
+          elo_relevant: eloRelevant,
+          time_control: timeControl,
+          time_limit_ms: actualTimeMs,
+          preferred_color: preferredColor,
+          allow_takeback: allowTakeback,
+          allow_chat: allowChat
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Fehler beim Senden.');
+
+      setShowChallengeModal(false);
+      setSelectedOpponent(null);
+      fetchChallenges();
+      onNavigate(`game:${data.gameId}`);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  useEffect(() => {
+    if (initialChallengeUserId && registeredUsers.length > 0) {
+      const opp = registeredUsers.find(u => u.id === initialChallengeUserId);
+      if (opp) {
+        setSelectedOpponent(opp);
+        setShowChallengeModal(true);
+      }
+    }
+  }, [initialChallengeUserId, registeredUsers]);
 
   const handleCreateGame = async (e) => {
     e.preventDefault();
@@ -131,20 +261,97 @@ export default function Dashboard({
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
         
-        {/* Left Column: Create Game */}
+        {/* Left Column: Create Game & Challenges */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
+          {/* Direct Challenges (Sent and Received) */}
+          {challenges.length > 0 && (
+            <div className="glass-panel animate-fade-in" style={{ border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+              <h3 style={{ fontSize: '1.2rem', color: 'var(--color-accent)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ✉️ Direkte Herausforderungen
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {challenges.map((ch) => {
+                  const isSent = ch.challenger_id === user.id;
+                  const opponentName = isSent 
+                    ? (ch.white_player_id === user.id ? ch.black_player_name : ch.white_player_name)
+                    : (ch.white_player_id === user.id ? ch.white_player_name : ch.black_player_name);
+                  
+                  return (
+                    <div 
+                      key={ch.id} 
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: 'var(--border-radius-md)',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.9rem' }}>
+                        {isSent ? (
+                          <span>Herausforderung an <strong>{opponentName}</strong> gesendet</span>
+                        ) : (
+                          <span>Herausforderung von <strong>{opponentName}</strong> erhalten</span>
+                        )}
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          ⏱️ {Math.round(ch.time_limit_ms / 60000)} Min | {ch.elo_relevant ? '🏆 Gewertet' : '🤝 Ungewertet'}
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {!isSent ? (
+                          <>
+                            <button 
+                              className="btn btn-primary" 
+                              onClick={() => handleAcceptChallenge(ch.id)}
+                              style={{ flex: 1, padding: '6px 12px', fontSize: '0.8rem' }}
+                            >
+                              Annehmen
+                            </button>
+                            <button 
+                              className="btn btn-danger" 
+                              onClick={() => handleDeclineChallenge(ch.id)}
+                              style={{ flex: 1, padding: '6px 12px', fontSize: '0.8rem' }}
+                            >
+                              Ablehnen
+                            </button>
+                          </>
+                        ) : (
+                          <button 
+                            className="btn btn-secondary" 
+                            onClick={() => handleDeclineChallenge(ch.id)}
+                            style={{ width: '100%', padding: '6px 12px', fontSize: '0.8rem' }}
+                          >
+                            Zurückziehen
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="glass-panel">
             {!showCreateForm ? (
               <div style={{ textAlign: 'center', padding: '12px 0' }}>
                 <span style={{ fontSize: '2.5rem' }}>⚔️</span>
                 <h3 style={{ fontSize: '1.3rem', margin: '12px 0' }}>Neues Schachspiel starten</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
-                  Konfiguriere deine Partie und lade einen Freund per Link ein.
+                  Lade einen Freund per Link ein oder fordere einen registrierten User direkt heraus.
                 </p>
-                <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setShowCreateForm(true)}>
-                  Spiel konfigurieren
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setShowCreateForm(true)}>
+                    Freund per Link einladen
+                  </button>
+                  <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => { setShowChallengeModal(true); setSelectedOpponent(null); }}>
+                    ⚔️ Spieler direkt herausfordern
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleCreateGame} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -360,6 +567,173 @@ export default function Dashboard({
         </div>
 
       </div>
+
+      {/* Challenge Modal */}
+      {showChallengeModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }}>
+          <div className="glass-panel animate-fade-in" style={{
+            maxWidth: '480px',
+            width: '100%',
+            padding: '24px',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)'
+          }}>
+            <h3 style={{ fontSize: '1.4rem', color: 'var(--color-accent)', marginBottom: '16px' }}>
+              ⚔️ Spieler herausfordern
+            </h3>
+            
+            <form onSubmit={handleSendChallenge} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', color: 'var(--text-muted)' }}>
+                  Gegner auswählen
+                </label>
+                {selectedOpponent ? (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--border-radius-sm)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <strong>{selectedOpponent.username} (ELO: {selectedOpponent.elo})</strong>
+                    {(!initialChallengeUserId) && (
+                      <button 
+                        type="button" 
+                        onClick={() => setSelectedOpponent(null)} 
+                        style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', fontSize: '0.9rem' }}
+                      >
+                        Entfernen
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <select
+                    onChange={(e) => {
+                      const user = registeredUsers.find(u => u.id === e.target.value);
+                      setSelectedOpponent(user || null);
+                    }}
+                    defaultValue=""
+                    style={{
+                      width: '100%',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'var(--text-main)',
+                      padding: '10px',
+                      borderRadius: 'var(--border-radius-sm)',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="" disabled>-- Bitte wählen --</option>
+                    {registeredUsers.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.username} (ELO: {u.elo})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', color: 'var(--text-muted)' }}>ELO-Wertung</label>
+                <select 
+                  value={eloRelevant ? 'yes' : 'no'} 
+                  onChange={(e) => setEloRelevant(e.target.value === 'yes')}
+                  disabled={user.isGuest}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '10px', borderRadius: 'var(--border-radius-sm)', outline: 'none' }}
+                >
+                  <option value="yes">Ja (Gewertete Partie)</option>
+                  <option value="no">Nein (Freundschaftsspiel)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', color: 'var(--text-muted)' }}>Zeitmodus</label>
+                <select 
+                  value={timeControl} 
+                  onChange={(e) => setTimeControl(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '10px', borderRadius: 'var(--border-radius-sm)', outline: 'none' }}
+                >
+                  <option value="blitz">Blitz (10 Min pro Spieler)</option>
+                  <option value="24h">24 Stunden pro Zug</option>
+                  <option value="48h">48 Stunden pro Zug</option>
+                  <option value="custom">Individuell</option>
+                </select>
+              </div>
+
+              {timeControl === 'custom' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', color: 'var(--text-muted)' }}>Zeitlimit (Minuten)</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="180" 
+                    defaultValue="10"
+                    onChange={(e) => setTimeLimitMs(parseInt(e.target.value) * 60 * 1000)}
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '10px', borderRadius: 'var(--border-radius-sm)', outline: 'none' }}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', color: 'var(--text-muted)' }}>Deine Farbe</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[['random', '🎲 Zufall'], ['white', '⚪ Weiß'], ['black', '⚫ Schwarz']].map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      className={`btn ${preferredColor === val ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ flex: 1, padding: '8px 12px', fontSize: '0.85rem' }}
+                      onClick={() => setPreferredColor(val)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={allowTakeback} onChange={(e) => setAllowTakeback(e.target.checked)} />
+                  Zug-Rücknahmen erlauben
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={allowChat} onChange={(e) => setAllowChat(e.target.checked)} />
+                  Chat erlauben
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Herausforderung senden</button>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => {
+                    setShowChallengeModal(false);
+                    setSelectedOpponent(null);
+                    if (initialChallengeUserId) {
+                      onNavigate('dashboard');
+                    }
+                  }}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

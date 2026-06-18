@@ -58,6 +58,11 @@ export default function GameView({
       setGame(prev => prev ? { ...prev, ...updatedPlayerDetails } : null);
     });
 
+    socket.on('game_declined', () => {
+      alert('Diese Herausforderung wurde abgelehnt oder abgebrochen.');
+      onNavigate('dashboard');
+    });
+
     socket.on('move_made', ({ game: updatedGame, move }) => {
       setGame(updatedGame);
       setMoves(prev => {
@@ -105,6 +110,7 @@ export default function GameView({
 
     return () => {
       socket.off('game_joined');
+      socket.off('game_declined');
       socket.off('move_made');
       socket.off('chat_received');
       socket.off('takeback_offered');
@@ -116,6 +122,36 @@ export default function GameView({
       socket.disconnect();
     };
   }, [gameId, token]);
+
+  const handleAcceptDirect = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/games/${gameId}/join`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Fehler beim Beitreten.');
+      fetchGameDetails();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeclineDirect = async () => {
+    if (window.confirm('Herausforderung wirklich ablehnen oder abbrechen?')) {
+      try {
+        const res = await fetch(`${API_BASE}/games/${gameId}/decline`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Fehler beim Ablehnen.');
+        onNavigate('dashboard');
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  };
 
   // Chess Clocks Tick Effect
   useEffect(() => {
@@ -219,20 +255,56 @@ export default function GameView({
       {/* Invitation pane for pending games */}
       {game.status === 'pending' && (
         <div className="glass-panel text-center animate-fade-in" style={{ padding: '32px', marginBottom: '24px', textAlign: 'center' }}>
-          <span style={{ fontSize: '2.5rem' }}>⏳</span>
-          <h3 style={{ margin: '12px 0', fontSize: '1.4rem' }}>Warte auf Gegner</h3>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
-            Gib deinem Gegner diesen Einladungslink, um die Partie zu starten:
-          </p>
-          <div style={{ display: 'flex', gap: '12px', maxWidth: '500px', margin: '0 auto' }}>
-            <input 
-              type="text" 
-              readOnly 
-              value={`${window.location.origin}/#game:${gameId}`} 
-              style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '10px', borderRadius: 'var(--border-radius-sm)', outline: 'none' }}
-            />
-            <button className="btn btn-primary" onClick={copyInviteLink}>Kopieren</button>
-          </div>
+          {game.challenger_id ? (
+            game.challenger_id === user.id ? (
+              // Current user is the challenger
+              <div>
+                <span style={{ fontSize: '2.5rem' }}>⏳</span>
+                <h3 style={{ margin: '12px 0', fontSize: '1.4rem' }}>Herausforderung gesendet</h3>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
+                  Warte darauf, dass <strong>{game.white_player_id === user.id ? game.black_player_name : game.white_player_name}</strong> deine Herausforderung annimmt...
+                </p>
+                <button className="btn btn-danger" onClick={handleDeclineDirect}>
+                  Herausforderung zurückziehen
+                </button>
+              </div>
+            ) : (
+              // Current user is the challenged opponent
+              <div>
+                <span style={{ fontSize: '2.5rem' }}>⚔️</span>
+                <h3 style={{ margin: '12px 0', fontSize: '1.4rem' }}>Herausforderung erhalten!</h3>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
+                  <strong>{game.challenger_id === game.white_player_id ? game.white_player_name : game.black_player_name}</strong> hat dich zu einer Partie herausgefordert.
+                </p>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <button className="btn btn-primary" onClick={handleAcceptDirect}>
+                    Annehmen
+                  </button>
+                  <button className="btn btn-danger" onClick={handleDeclineDirect}>
+                    Ablehnen
+                  </button>
+                </div>
+              </div>
+            )
+          ) : (
+            // Standard invite link flow
+            <div>
+              <span style={{ fontSize: '2.5rem' }}>⏳</span>
+              <h3 style={{ margin: '12px 0', fontSize: '1.4rem' }}>Warte auf Gegner</h3>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
+                Gib deinem Gegner diesen Einladungslink, um die Partie zu starten:
+              </p>
+              <div style={{ display: 'flex', gap: '12px', maxWidth: '500px', margin: '0 auto' }}>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={`${window.location.origin}/#game:${gameId}`} 
+                  style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '10px', borderRadius: 'var(--border-radius-sm)', outline: 'none' }}
+                />
+                <button className="btn btn-primary" onClick={copyInviteLink}>Kopieren</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

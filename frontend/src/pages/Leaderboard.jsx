@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../config';
 
-export default function Leaderboard({ onNavigate }) {
+export default function Leaderboard({ onNavigate, user }) {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +19,7 @@ export default function Leaderboard({ onNavigate }) {
   }, []);
 
   return (
-    <div className="animate-fade-in" style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
+    <div className="animate-fade-in" style={{ padding: '24px', maxWidth: '850px', margin: '0 auto' }}>
       
       <button className="btn btn-secondary" onClick={() => onNavigate('dashboard')} style={{ marginBottom: '24px' }}>
         🏠 Zurück zum Dashboard
@@ -44,6 +44,7 @@ export default function Leaderboard({ onNavigate }) {
                   <th style={{ padding: '12px' }}>Spieler</th>
                   <th style={{ padding: '12px', textAlign: 'right' }}>ELO</th>
                   <th style={{ padding: '12px', textAlign: 'right' }}>Höchste ELO</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Aktion</th>
                 </tr>
               </thead>
               <tbody>
@@ -79,6 +80,19 @@ export default function Leaderboard({ onNavigate }) {
                       </td>
                       <td style={{ padding: '14px 12px', textAlign: 'right', color: 'var(--text-muted)' }}>
                         {p.highest_elo}
+                      </td>
+                      <td style={{ padding: '14px 12px', textAlign: 'right' }}>
+                        {p.is_guest === 0 && p.id !== user.id ? (
+                          <button 
+                            className="btn btn-primary" 
+                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                            onClick={() => onNavigate(`dashboard:${p.id}`)}
+                          >
+                            ⚔️ Herausfordern
+                          </button>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>-</span>
+                        )}
                       </td>
                     </tr>
                   );

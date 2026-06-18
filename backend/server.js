@@ -177,6 +177,7 @@ app.post('/api/auth/guest', async (req, res) => {
 // Create Game
 app.post('/api/games', authenticateToken, async (req, res) => {
   const {
+    opponent_id,
     elo_relevant,
     time_control,
     time_limit_ms,
@@ -196,31 +197,54 @@ app.post('/api/games', authenticateToken, async (req, res) => {
   let black_player_id = null;
   let white_player_name = 'Ausstehend...';
   let black_player_name = 'Ausstehend...';
-
-  if (playerColor === 'white') {
-    white_player_id = req.user.id;
-    white_player_name = req.user.username;
-  } else {
-    black_player_id = req.user.id;
-    black_player_name = req.user.username;
-  }
-
-  // Clocks
-  const defaultClocks = {
-    blitz: 600000, // 10 mins
-    '24h': 86400000,
-    '48h': 172800000,
-    custom: time_limit_ms || 600000
-  };
-  const timer = defaultClocks[time_control] || defaultClocks.blitz;
+  let challenger_id = null;
+  let final_is_private = is_private ? 1 : 0;
 
   try {
+    if (opponent_id) {
+      const opponent = await db.get('SELECT id, username FROM users WHERE id = ?', [opponent_id]);
+      if (!opponent) {
+        return res.status(404).json({ error: 'Herausgeforderter Spieler nicht gefunden.' });
+      }
+      challenger_id = req.user.id;
+      final_is_private = 1; // Direct challenges are private
+
+      if (playerColor === 'white') {
+        white_player_id = req.user.id;
+        white_player_name = req.user.username;
+        black_player_id = opponent.id;
+        black_player_name = opponent.username;
+      } else {
+        black_player_id = req.user.id;
+        black_player_name = req.user.username;
+        white_player_id = opponent.id;
+        white_player_name = opponent.username;
+      }
+    } else {
+      if (playerColor === 'white') {
+        white_player_id = req.user.id;
+        white_player_name = req.user.username;
+      } else {
+        black_player_id = req.user.id;
+        black_player_name = req.user.username;
+      }
+    }
+
+    // Clocks
+    const defaultClocks = {
+      blitz: 600000, // 10 mins
+      '24h': 86400000,
+      '48h': 172800000,
+      custom: time_limit_ms || 600000
+    };
+    const timer = defaultClocks[time_control] || defaultClocks.blitz;
+
     await db.run(
       `INSERT INTO games (
         id, white_player_id, black_player_id, white_player_name, black_player_name,
         elo_relevant, time_control, time_limit_ms, white_time_left, black_time_left,
-        status, allow_takeback, allow_chat, is_private, tournament_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+        status, allow_takeback, allow_chat, is_private, tournament_id, challenger_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
       [
         gameId,
         white_player_id,
@@ -234,8 +258,9 @@ app.post('/api/games', authenticateToken, async (req, res) => {
         timer,
         allow_takeback ? 1 : 0,
         allow_chat ? 1 : 0,
-        is_private ? 1 : 0,
-        tournament_id || null
+        final_is_private,
+        tournament_id || null,
+        challenger_id
       ]
     );
 
@@ -246,7 +271,7 @@ app.post('/api/games', authenticateToken, async (req, res) => {
   }
 });
 
-// Join Game by Invite Link
+// Join Game / Accept Challenge
 app.post('/api/games/:gameId/join', authenticateToken, async (req, res) => {
   const { gameId } = req.params;
   try {
@@ -254,7 +279,35 @@ app.post('/api/games/:gameId/join', authenticateToken, async (req, res) => {
     if (!game) return res.status(404).json({ error: 'Spiel nicht gefunden.' });
     if (game.status !== 'pending') return res.status(400).json({ error: 'Spiel läuft bereits oder ist beendet.' });
 
-    // Check if player is already in the game
+    // Check if it's a direct challenge with both players already assigned
+    if (game.challenger_id && game.white_player_id && game.black_player_id) {
+      if (req.user.id !== game.white_player_id && req.user.id !== game.black_player_id) {
+        return res.status(403).json({ error: 'Dieses Spiel ist eine private Herausforderung.' });
+      }
+
+      if (req.user.id === game.challenger_id) {
+        return res.json({ message: 'Bereits im Spiel.' });
+      } else {
+        // The opponent accepts the challenge
+        await db.run(
+          'UPDATE games SET status = "playing", last_move_timestamp = ? WHERE id = ?',
+          [Date.now(), gameId]
+        );
+
+        // Notify room
+        io.to(`game:${gameId}`).emit('game_joined', {
+          white_player_id: game.white_player_id,
+          white_player_name: game.white_player_name,
+          black_player_id: game.black_player_id,
+          black_player_name: game.black_player_name,
+          status: 'playing'
+        });
+
+        return res.json({ success: true, message: 'Herausforderung angenommen.' });
+      }
+    }
+
+    // Check if player is already in the game (for regular invite/public links)
     if (game.white_player_id === req.user.id || game.black_player_id === req.user.id) {
       return res.json({ message: 'Bereits im Spiel.' });
     }
@@ -287,6 +340,64 @@ app.post('/api/games/:gameId/join', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Fehler beim Beitritt.' });
+  }
+});
+
+// Decline or Cancel Game Challenge
+app.post('/api/games/:gameId/decline', authenticateToken, async (req, res) => {
+  const { gameId } = req.params;
+  try {
+    const game = await db.get('SELECT * FROM games WHERE id = ?', [gameId]);
+    if (!game) return res.status(404).json({ error: 'Spiel nicht gefunden.' });
+    if (game.status !== 'pending') return res.status(400).json({ error: 'Spiel läuft bereits oder ist beendet.' });
+
+    // Only challenger or challenged player can delete/decline
+    if (req.user.id !== game.white_player_id && req.user.id !== game.black_player_id) {
+      return res.status(403).json({ error: 'Nicht berechtigt.' });
+    }
+
+    await db.run('DELETE FROM games WHERE id = ?', [gameId]);
+
+    // Notify room that challenge has been cancelled/declined
+    io.to(`game:${gameId}`).emit('game_declined', { gameId });
+
+    res.json({ success: true, message: 'Herausforderung abgelehnt/abgebrochen.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Fehler beim Ablehnen der Herausforderung.' });
+  }
+});
+
+// List Direct Challenges
+app.get('/api/challenges', authenticateToken, async (req, res) => {
+  try {
+    const challenges = await db.all(
+      `SELECT * FROM games 
+       WHERE status = 'pending' 
+         AND challenger_id IS NOT NULL 
+         AND (white_player_id = ? OR black_player_id = ?)`,
+      [req.user.id, req.user.id]
+    );
+    res.json(challenges);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Herausforderungen.' });
+  }
+});
+
+// List Registered Users to Challenge
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    const users = await db.all(
+      `SELECT id, username, elo FROM users 
+       WHERE is_guest = 0 AND id != ? 
+       ORDER BY username ASC`,
+      [req.user.id]
+    );
+    res.json(users);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Benutzerliste.' });
   }
 });
 

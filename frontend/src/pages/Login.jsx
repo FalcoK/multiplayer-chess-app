@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../config';
 
-export default function Login({ onLoginSuccess }) {
+export default function Login({ onLoginSuccess, onBackToLanding }) {
   const [mode, setMode] = useState('offline'); // 'offline' or 'online'
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
@@ -306,6 +306,32 @@ export default function Login({ onLoginSuccess }) {
                 {isRegister ? 'Bereits ein Konto? Hier anmelden' : 'Noch kein Konto? Hier registrieren'}
               </a>
             </div>
+          </div>
+        )}
+
+        {onBackToLanding && (
+          <div style={{ textAlign: 'center', marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '14px' }}>
+            <a
+              id="back-to-landing-btn"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                onBackToLanding();
+              }}
+              style={{ 
+                color: 'var(--text-muted)', 
+                textDecoration: 'none', 
+                fontSize: '0.82rem', 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '4px',
+                transition: 'color 0.2s ease'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.color = 'var(--color-accent)'}
+              onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+            >
+              ← Zurück zur App-Sammlung
+            </a>
           </div>
         )}
 

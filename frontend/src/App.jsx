@@ -7,6 +7,7 @@ import Profile from './pages/Profile';
 import TournamentList from './pages/TournamentList';
 import TournamentView from './pages/TournamentView';
 import GameVsComputer from './pages/GameVsComputer';
+import LandingPage from './pages/LandingPage';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('chess_token') || null);
@@ -14,7 +15,7 @@ function App() {
   const [theme, setTheme] = useState(localStorage.getItem('chess_theme') || 'light');
   
   // Custom hash routing state
-  const [route, setRoute] = useState({ page: 'dashboard', param: null });
+  const [route, setRoute] = useState({ page: 'landing', param: null });
 
   // Sync theme to body class list
   useEffect(() => {
@@ -30,8 +31,8 @@ function App() {
   useEffect(() => {
     const parseHash = () => {
       const hash = window.location.hash.substring(1); // Remove '#'
-      if (!hash) {
-        setRoute({ page: 'dashboard', param: null });
+      if (!hash || hash === 'landing') {
+        setRoute({ page: 'landing', param: null });
         return;
       }
 
@@ -41,6 +42,8 @@ function App() {
         setRoute({ page: 'profile', param: hash.split(':')[1] });
       } else if (hash.startsWith('tournament:')) {
         setRoute({ page: 'tournament', param: hash.split(':')[1] });
+      } else if (hash.startsWith('dashboard:')) {
+        setRoute({ page: 'dashboard', param: hash.split(':')[1] });
       } else {
         setRoute({ page: hash, param: null });
       }
@@ -114,12 +117,22 @@ function App() {
     </button>
   );
 
-  // If not logged in, enforce Login Page
+  // Render landing page
+  if (route.page === 'landing') {
+    return (
+      <div className="app-container">
+        {renderThemeToggle()}
+        <LandingPage onNavigate={navigateTo} />
+      </div>
+    );
+  }
+
+  // If not logged in and visiting chess app, enforce Login Page
   if (!token || !user) {
     return (
       <div className="app-container">
         {renderThemeToggle()}
-        <Login onLoginSuccess={handleLoginSuccess} />
+        <Login onLoginSuccess={handleLoginSuccess} onBackToLanding={() => navigateTo('landing')} />
       </div>
     );
   }
@@ -135,6 +148,7 @@ function App() {
           token={token} 
           onNavigate={navigateTo} 
           onLogout={handleLogout} 
+          initialChallengeUserId={route.param}
         />
       )}
       
@@ -158,6 +172,7 @@ function App() {
       {route.page === 'leaderboard' && (
         <Leaderboard 
           onNavigate={navigateTo} 
+          user={user}
         />
       )}
 

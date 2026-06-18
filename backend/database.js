@@ -114,11 +114,12 @@ async function initDatabase() {
       // In Postgres, we can execute the whole schema block at once
       await pgPool.query(schema);
       
-      // Auto-migrations for email verification
+      // Auto-migrations for email verification and game challenges
       try {
         await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE');
         await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified INTEGER DEFAULT 0');
         await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token VARCHAR(255)');
+        await pgPool.query('ALTER TABLE games ADD COLUMN IF NOT EXISTS challenger_id VARCHAR(255)');
       } catch (e) {
         console.warn('Postgres migration warning:', e.message);
       }
@@ -157,6 +158,7 @@ async function initDatabase() {
         sqliteDb.run('ALTER TABLE users ADD COLUMN email TEXT;', () => {});
         sqliteDb.run('ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0;', () => {});
         sqliteDb.run('ALTER TABLE users ADD COLUMN verification_token TEXT;', () => {});
+        sqliteDb.run('ALTER TABLE games ADD COLUMN challenger_id TEXT;', () => {});
 
         if (success) {
           console.log('SQLite database schema initialized.');

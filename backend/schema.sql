@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS games (
   pgn TEXT DEFAULT '',
   fen TEXT DEFAULT 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', -- Active board state
   tournament_id TEXT,
+  challenger_id TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (white_player_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (black_player_id) REFERENCES users(id) ON DELETE SET NULL,
