@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { socket } from './socket';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import GameView from './pages/GameView';
@@ -26,6 +27,39 @@ function App() {
       document.body.classList.remove('light-theme');
     }
   }, [theme]);
+
+  // Global socket connection and turn notification listener
+  useEffect(() => {
+    if (token && user) {
+      socket.connect();
+      socket.emit('register_user', { userId: user.id });
+
+      const handleYourTurn = ({ gameId, opponentName }) => {
+        // Only notify if user is NOT currently looking at the game
+        if (window.location.hash !== `#game:${gameId}`) {
+          if ('Notification' in window && Notification.permission === 'granted') {
+            const n = new Notification('Du bist am Zug! ♟️', {
+              body: `${opponentName} hat einen Zug gemacht. Klicke hier, um weiterzuspielen.`,
+              tag: `turn:${gameId}`,
+              data: { gameId }
+            });
+            n.onclick = () => {
+              window.focus();
+              window.location.hash = `#game:${gameId}`;
+            };
+          }
+        }
+      };
+
+      socket.on('your_turn', handleYourTurn);
+
+      return () => {
+        socket.off('your_turn', handleYourTurn);
+        socket.disconnect();
+      };
+    }
+  }, [token, user]);
+
 
   // Handle URL hash changes
   useEffect(() => {

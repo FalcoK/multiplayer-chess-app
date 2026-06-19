@@ -119,7 +119,7 @@ export default function GameView({
       socket.off('draw_offered');
       socket.off('draw_declined');
       socket.off('game_finished');
-      socket.disconnect();
+      // Connection is managed globally in App.jsx
     };
   }, [gameId, token]);
 

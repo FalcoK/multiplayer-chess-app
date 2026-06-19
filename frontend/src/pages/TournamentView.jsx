@@ -25,7 +25,7 @@ export default function TournamentView({
 
     return () => {
       socket.off('tournament_update');
-      socket.disconnect();
+      // Connection is managed globally in App.jsx
     };
   }, [tournamentId]);
 

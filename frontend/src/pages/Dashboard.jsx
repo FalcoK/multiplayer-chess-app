@@ -13,6 +13,13 @@ export default function Dashboard({
   const [loadingGames, setLoadingGames] = useState(true);
   const [loadingTournaments, setLoadingTournaments] = useState(true);
   
+  // Ongoing games and notifications state
+  const [ongoingGames, setOngoingGames] = useState([]);
+  const [loadingOngoing, setLoadingOngoing] = useState(true);
+  const [notificationPermission, setNotificationPermission] = useState(
+    'Notification' in window ? Notification.permission : 'denied'
+  );
+  
   // Direct challenges and user list state
   const [challenges, setChallenges] = useState([]);
   const [registeredUsers, setRegisteredUsers] = useState([]);
@@ -37,15 +44,39 @@ export default function Dashboard({
     fetchTournaments();
     fetchChallenges();
     fetchRegisteredUsers();
+    fetchOngoingGames();
 
     const interval = setInterval(() => {
       fetchGames();
       fetchTournaments();
       fetchChallenges();
+      fetchOngoingGames();
     }, 5000);
 
     return () => clearInterval(interval);
   }, [token]);
+
+  const fetchOngoingGames = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/games/ongoing`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setOngoingGames(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingOngoing(false);
+    }
+  };
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return;
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+  };
 
   const fetchGames = async () => {
     try {
@@ -259,6 +290,34 @@ export default function Dashboard({
         </div>
       </div>
 
+      {/* Desktop Notification Alert Banner */}
+      {notificationPermission === 'default' && (
+        <div className="glass-panel animate-fade-in" style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '16px 20px',
+          marginBottom: '24px',
+          background: 'rgba(56, 189, 248, 0.1)',
+          border: '1px solid rgba(56, 189, 248, 0.3)',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '1.5rem' }}>🔔</span>
+            <div>
+              <strong style={{ display: 'block', fontSize: '0.95rem' }}>Spielzüge per Push erhalten?</strong>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                Wir benachrichtigen dich, sobald dein Gegner zieht. (Funktioniert, solange die App in einem Tab geöffnet ist)
+              </span>
+            </div>
+          </div>
+          <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={requestNotificationPermission}>
+            Aktivieren
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
         
         {/* Left Column: Create Game & Challenges */}
@@ -458,6 +517,81 @@ export default function Dashboard({
         {/* Right Column: Open Games & Tournaments Lobby */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
+          {/* Meine laufenden Spiele */}
+          {ongoingGames.length > 0 && (
+            <div className="glass-panel animate-fade-in" style={{ border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '1.2rem', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ♟️ Meine laufenden Spiele
+                </h3>
+                <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={fetchOngoingGames}>🔄 Aktualisieren</button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {ongoingGames.map((game) => {
+                  const isWhite = game.white_player_id === user.id;
+                  const opponentName = isWhite ? game.black_player_name : game.white_player_name;
+                  const timeLimitMins = Math.round(game.time_limit_ms / 60000);
+                  
+                  // Parse FEN to find who is at turn
+                  const fenParts = game.fen ? game.fen.split(' ') : [];
+                  const fenTurn = fenParts[1] || 'w'; // 'w' or 'b'
+                  const isMyTurn = (fenTurn === 'w' && isWhite) || (fenTurn === 'b' && !isWhite);
+                  
+                  return (
+                    <div 
+                      key={game.id} 
+                      style={{
+                        background: isMyTurn ? 'rgba(16, 185, 129, 0.04)' : 'rgba(255, 255, 255, 0.03)',
+                        border: isMyTurn ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: 'var(--border-radius-md)',
+                        padding: '14px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '12px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <strong style={{ fontSize: '0.95rem' }}>vs {opponentName}</strong>
+                          <span style={{ 
+                            fontSize: '0.75rem', 
+                            padding: '2px 8px', 
+                            borderRadius: '12px',
+                            fontWeight: 'bold',
+                            background: isMyTurn ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.15)',
+                            color: isMyTurn ? 'var(--color-success)' : 'var(--color-warning)',
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }}>
+                            {isMyTurn ? '● Du bist am Zug' : '○ Gegner ist am Zug'}
+                          </span>
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '6px' }}>
+                          ⏱️ {timeLimitMins} Min | {game.elo_relevant ? '🏆 Gewertet' : '🤝 Ungewertet'}
+                        </div>
+                      </div>
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={() => onNavigate(`game:${game.id}`)}
+                        style={{ 
+                          padding: '8px 16px', 
+                          fontSize: '0.85rem',
+                          background: isMyTurn ? 'linear-gradient(135deg, var(--color-success), #059669)' : 'linear-gradient(135deg, var(--color-accent), #4f46e5)'
+                        }}
+                      >
+                        Weiterspielen
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Live Lobby */}
           <div className="glass-panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

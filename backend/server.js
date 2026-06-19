@@ -303,6 +303,14 @@ app.post('/api/games/:gameId/join', authenticateToken, async (req, res) => {
           status: 'playing'
         });
 
+        // Notify White that Black accepted the challenge and it is White's turn
+        if (req.user.id === game.black_player_id) {
+          io.to(`user:${game.white_player_id}`).emit('your_turn', {
+            gameId,
+            opponentName: game.black_player_name
+          });
+        }
+
         return res.json({ success: true, message: 'Herausforderung angenommen.' });
       }
     }
@@ -314,11 +322,14 @@ app.post('/api/games/:gameId/join', authenticateToken, async (req, res) => {
 
     let query = '';
     let params = [];
+    let isWhiteJoiner = false;
 
     if (!game.white_player_id) {
+      isWhiteJoiner = true;
       query = "UPDATE games SET white_player_id = ?, white_player_name = ?, status = 'playing', last_move_timestamp = ? WHERE id = ?";
       params = [req.user.id, req.user.username, Date.now(), gameId];
     } else if (!game.black_player_id) {
+      isWhiteJoiner = false;
       query = "UPDATE games SET black_player_id = ?, black_player_name = ?, status = 'playing', last_move_timestamp = ? WHERE id = ?";
       params = [req.user.id, req.user.username, Date.now(), gameId];
     } else {
@@ -335,6 +346,14 @@ app.post('/api/games/:gameId/join', authenticateToken, async (req, res) => {
       black_player_name: game.black_player_name !== 'Ausstehend...' ? game.black_player_name : req.user.username,
       status: 'playing'
     });
+
+    // Notify White that Black joined and it's White's turn
+    if (!isWhiteJoiner && game.white_player_id) {
+      io.to(`user:${game.white_player_id}`).emit('your_turn', {
+        gameId,
+        opponentName: req.user.username
+      });
+    }
 
     res.json({ success: true });
   } catch (err) {
@@ -427,6 +446,22 @@ app.get('/api/games', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Fehler beim Abrufen der Spiele.' });
+  }
+});
+
+// List Ongoing Games for user
+app.get('/api/games/ongoing', authenticateToken, async (req, res) => {
+  try {
+    const games = await db.all(
+      `SELECT * FROM games 
+       WHERE status NOT IN ('finished', 'pending') 
+         AND (white_player_id = ? OR black_player_id = ?)`,
+      [req.user.id, req.user.id]
+    );
+    res.json(games);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Fehler beim Abrufen der laufenden Spiele.' });
   }
 });
 
@@ -718,6 +753,11 @@ app.post('/api/tournaments/:id/start', authenticateToken, async (req, res) => {
 io.on('connection', (socket) => {
   console.log('Socket client connected:', socket.id);
 
+  socket.on('register_user', ({ userId }) => {
+    socket.join(`user:${userId}`);
+    console.log(`Socket ${socket.id} registered for user ${userId}`);
+  });
+
   socket.on('join_game', async ({ gameId, token }) => {
     try {
       socket.join(`game:${gameId}`);
@@ -840,6 +880,19 @@ io.on('connection', (socket) => {
         game: updatedGame,
         move: addedMove
       });
+
+      // Send turn alert if game is still in progress
+      if (!validation.isGameOver) {
+        const nextTurn = new Chess(validation.fen).turn(); // 'w' or 'b'
+        const opponentId = nextTurn === 'w' ? updatedGame.white_player_id : updatedGame.black_player_id;
+        const activePlayerName = nextTurn === 'w' ? updatedGame.black_player_name : updatedGame.white_player_name;
+        if (opponentId) {
+          io.to(`user:${opponentId}`).emit('your_turn', {
+            gameId,
+            opponentName: activePlayerName
+          });
+        }
+      }
 
       // Handle Game Over ELO updates
       if (validation.isGameOver) {
